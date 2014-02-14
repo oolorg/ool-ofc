@@ -1,0 +1,12 @@
+{
+    "list" : [
+        {
+            "ofsIp":"192.168.1.10",
+            "ofsDatapathId":1
+        },
+        {
+            "ofsIp":"192.168.1.20",
+            "ofsDatapathId":2
+        }
+    ]
+}
