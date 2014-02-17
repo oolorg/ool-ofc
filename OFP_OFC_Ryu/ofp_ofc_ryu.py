@@ -136,7 +136,7 @@ class SwitchController(ControllerBase):
 		try:
 			switch_ctrl.del_flow(dpid, int(queryParam['port'][0]), int(queryParam['port'][1]))
 			switch_ctrl.del_flow(dpid, int(queryParam['port'][1]), int(queryParam['port'][0]))
-			ret = self.set_response_data()
+			ret = self.set_response_data(200)
 		except Exception as e:
 			print e
 			ret = self.set_response_data(500, 'Internal server error')
@@ -151,7 +151,7 @@ class SwitchController(ControllerBase):
 		return ret
 
 	def set_response_data(self, state=201, message = ''):
-		response_data = {'Status':state, 'Message':message}
+		response_data = {'status':state, 'message':message}
 		res = Response(content_type = 'application/json', body = json.dumps(response_data))
 		print(json.dumps(response_data))
 		return res
