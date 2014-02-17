@@ -4,6 +4,7 @@ import json
 import struct
 import threading
 import time
+import cgi
 
 from ryu.app.wsgi import ControllerBase, WSGIApplication, route
 from ryu.base import app_manager
@@ -79,9 +80,9 @@ class SwitchController(ControllerBase):
 		super(SwitchController, self).__init__(req, link, data, **config)
 		self.switch_ctrl_spp = data[ofp_ofc_ryu_instance_name]
 
-	@route('switch_ctrl', url, methods=['PUT'])
-	def put_flow(self, req, **kwargs):
-		print('\nPUT: ' + req.body)
+	@route('switch_ctrl', url, methods=['POST'])
+	def post_flow(self, req, **kwargs):
+		print('\nPOST: ' + req.body)
 		reqBody = eval(req.body)
 		dpid = None
 		switch_ctrl = self.switch_ctrl_spp
@@ -94,8 +95,8 @@ class SwitchController(ControllerBase):
 			return self.set_response_data(400, 'Do not find datapath id: ' + reqBody['ip'])
 
 		try:
-			switch_ctrl.add_flow(dpid, reqBody['inPort'], reqBody['outPort'])
-			switch_ctrl.add_flow(dpid, reqBody['outPort'], reqBody['inPort'])
+			switch_ctrl.add_flow(dpid, reqBody['port'][0], reqBody['port'][1])
+			switch_ctrl.add_flow(dpid, reqBody['port'][1], reqBody['port'][0])
 			ret = self.set_response_data()
 		except Exception as e:
 			print e
@@ -105,22 +106,36 @@ class SwitchController(ControllerBase):
 
 	@route('switch_ctrl', url, methods=['DELETE'])
 	def delete_flow(self, req, **kwargs):
-		print('\nDELETE: ' + req.body)
 		ret = None
-		reqBody = eval(req.body)
 		dpid = None
 		switch_ctrl = self.switch_ctrl_spp
 		ip_id_map = switch_ctrl.ip_id_map
 
+###
+		queryStr = req.environ.get('QUERY_STRING')
+		print('\nDELETE : QUERY_STRING : ' + queryStr)
+		query = cgi.parse_qsl(queryStr)
+		queryParam = {}
+		for param in query:
+			if param[0] == 'ip':
+				queryParam.update({'ip':param[1]})
+			if param[0] == 'port':
+				queryParam.update({'port':param[1].split(",")})
+
+		print('\nqueryParam[\'ip\'] = ' + queryParam['ip'])
+		print('queryParam[\'port\'][0] = ' + queryParam['port'][0])
+		print('queryParam[\'port\'][1] = ' + queryParam['port'][1])
+###
+
 		for list in ip_id_map['list']:
-			if list['ofsIp'] == reqBody['ip']:
+			if list['ofsIp'] == queryParam['ip']:
 				dpid = switch_ctrl.switches[list['ofsDatapathId']]
 		if dpid == None:
-			return self.set_response_data(400, 'Do not find datapath id: ' + reqBody['ip'])
+			return self.set_response_data(400, 'Do not find datapath id: ' + queryParam['ip'])
 
 		try:
-			switch_ctrl.del_flow(dpid, reqBody['inPort'], reqBody['outPort'])
-			switch_ctrl.del_flow(dpid, reqBody['outPort'], reqBody['inPort'])
+			switch_ctrl.del_flow(dpid, int(queryParam['port'][0]), int(queryParam['port'][1]))
+			switch_ctrl.del_flow(dpid, int(queryParam['port'][1]), int(queryParam['port'][0]))
 			ret = self.set_response_data()
 		except Exception as e:
 			print e
