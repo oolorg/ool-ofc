@@ -1,6 +1,6 @@
 import logging
+import logging.handlers
 import json
-
 import struct
 import threading
 import time
@@ -18,7 +18,28 @@ from ryu.ofproto import ofproto_v1_3
 from ryu.topology.switches import get_switch, get_link
 from webob import Response
 
-LOG = logging.getLogger('ryu.app.ofp_ofc_ryu')
+# define log data
+LOG_FILENAME = 'log.out'
+LOG_LEVEL = logging.DEBUG
+LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s : %(message)s"
+# create formatter
+formatter = logging.Formatter(LOG_FORMAT)
+#logging.basicConfig(level=logging.ERROR, format=LOG_FORMAT)
+# create logger
+ofc_logger = logging.getLogger('ofp_ofc_ryu')
+ofc_logger.setLevel(LOG_LEVEL)
+# create file handler
+handler_file = logging.handlers.RotatingFileHandler(
+            LOG_FILENAME,
+            maxBytes=512*1024,
+            backupCount=2)
+handler_file.setFormatter(formatter)
+ofc_logger.addHandler(handler_file)
+# create console handler
+#handler_stream = logging.StreamHandler()
+#handler_stream.setFormatter(formatter)
+#ofc_logger.addHandler(handler_stream)
+
 ofp_ofc_ryu_instance_name = 'ofp_ofc_ryu_instance_name'
 
 url = '/ofc/ryu/ctrl'
@@ -42,7 +63,7 @@ class SimpleSwitch(app_manager.RyuApp):
 	def _switch_features_handler(self, ev):
 		datapath = ev.msg.datapath
 		self.switches[datapath.id] = datapath
-		print('Switch is joined:' + str(datapath.id))
+		ofc_logger.info('Switch is joined:' + str(datapath.id))
 
 	def add_flow(self, dp, in_port, out_port):
 		ofproto = dp.ofproto
@@ -82,24 +103,26 @@ class SwitchController(ControllerBase):
 
 	@route('switch_ctrl', url, methods=['POST'])
 	def post_flow(self, req, **kwargs):
-		print('\nPOST: ' + req.body)
 		reqBody = eval(req.body)
 		dpid = None
 		switch_ctrl = self.switch_ctrl_spp
 		ip_id_map = switch_ctrl.ip_id_map
 
+		queryStr = req.environ.get('QUERY_STRING')
+		ofc_logger.debug('POST : QUERY_STRING:' + str(queryStr) + ', body = ' + str(req.body))
+
 		for list in ip_id_map['list']:
 			if list['ofsIp'] == reqBody['ip']:
 				dpid = switch_ctrl.switches[list['ofsDatapathId']]
 		if dpid == None:
-			return self.set_response_data(400, 'Do not find datapath id: ' + reqBody['ip'])
+			return self.set_response_data(400, 'Do not find datapath id: ip = ' + reqBody['ip'])
 
 		try:
 			switch_ctrl.add_flow(dpid, reqBody['port'][0], reqBody['port'][1])
 			switch_ctrl.add_flow(dpid, reqBody['port'][1], reqBody['port'][0])
 			ret = self.set_response_data()
 		except Exception as e:
-			print e
+			ofc_logger.error(e)
 			ret = self.set_response_data(500, 'Internal server error')
 
 		return ret
@@ -111,9 +134,8 @@ class SwitchController(ControllerBase):
 		switch_ctrl = self.switch_ctrl_spp
 		ip_id_map = switch_ctrl.ip_id_map
 
-###
 		queryStr = req.environ.get('QUERY_STRING')
-		print('\nDELETE : QUERY_STRING : ' + queryStr)
+		ofc_logger.debug('DELETE : QUERY_STRING:' + str(queryStr) + ', body = ' + str(req.body))
 		query = cgi.parse_qsl(queryStr)
 		queryParam = {}
 		for param in query:
@@ -122,38 +144,41 @@ class SwitchController(ControllerBase):
 			if param[0] == 'port':
 				queryParam.update({'port':param[1].split(",")})
 
-		print('\nqueryParam[\'ip\'] = ' + queryParam['ip'])
-		print('queryParam[\'port\'][0] = ' + queryParam['port'][0])
-		print('queryParam[\'port\'][1] = ' + queryParam['port'][1])
-###
+		ofc_logger.debug('ip = ' + queryParam['ip'] + ', port[0] = ' + queryParam['port'][0] + ', port[1] = ' + queryParam['port'][1])
 
 		for list in ip_id_map['list']:
 			if list['ofsIp'] == queryParam['ip']:
 				dpid = switch_ctrl.switches[list['ofsDatapathId']]
 		if dpid == None:
-			return self.set_response_data(400, 'Do not find datapath id: ' + queryParam['ip'])
+			return self.set_response_data(400, 'Do not find datapath id: ip = ' + queryParam['ip'])
 
 		try:
 			switch_ctrl.del_flow(dpid, int(queryParam['port'][0]), int(queryParam['port'][1]))
 			switch_ctrl.del_flow(dpid, int(queryParam['port'][1]), int(queryParam['port'][0]))
 			ret = self.set_response_data(200)
 		except Exception as e:
-			print e
+			ofc_logger.error(e)
 			ret = self.set_response_data(500, 'Internal server error')
 
 		return ret
 
 	@route('ctrl', '/ctrl', methods=['OPTIONS'])
 	def options_ctrl(self, req, **kwargs):
+		queryStr = req.environ.get('QUERY_STRING')
+		ofc_logger.debug('OPTIONS : QUERY_STRING:' + str(queryStr) + ', body = ' + str(req.body))
 		ret = self.set_response_data()
 		ret = set_response_headers_for_all(ret)
 		ret = set_response_headers_for_options(ret)
 		return ret
 
-	def set_response_data(self, state=201, message = ''):
-		response_data = {'status':state, 'message':message}
+	def set_response_data(self, status=201, message = ''):
+		response_data = {'status':status, 'message':message}
 		res = Response(content_type = 'application/json', body = json.dumps(response_data))
-		print(json.dumps(response_data))
+		if status == 200 or status == 201:
+			ofc_logger.debug("status = " + str(status) + ", message = \"" + message + "\"")
+		else:
+			ofc_logger.error("status = " + str(status) + ", message = \"" + message + "\"")
+
 		return res
 
 	def set_response_headers_for_all(res):
