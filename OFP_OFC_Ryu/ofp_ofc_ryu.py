@@ -19,7 +19,7 @@ from ryu.topology.switches import get_switch, get_link
 from webob import Response
 
 # define log data
-LOG_FILENAME = 'log.out'
+LOG_FILENAME = '/var/log/ool-ofc/log.out'
 LOG_LEVEL = logging.DEBUG
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s : %(message)s"
 # create formatter
@@ -52,7 +52,7 @@ class SimpleSwitch(app_manager.RyuApp):
 		super(SimpleSwitch, self).__init__(*args, **kwargs)
 		self.switches = {}
 		wsgi = kwargs['wsgi']
-		wsgi.register(SwitchController, {ofp_ofc_ryu_instance_name : self}) 
+		wsgi.register(SwitchController, {ofp_ofc_ryu_instance_name : self})
 
 		# 'IP address - datapath id' map data
 		f = open('config.txt')
