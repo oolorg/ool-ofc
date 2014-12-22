@@ -1,6 +1,0 @@
-{
-    "ofpmSetFlowUrl":"http://172.16.1.8:18080/ofpm/logical_topology/setFlow",
-    "ofpmInitFlowUrl":"http://172.16.1.8:18080/ofpm/logical_topology/initFlow",
-    "ofpmUrl_bak_1":"http://172.16.254.6:8080/ofpservice/logical_topology/setFlow",
-    "ofpmUrl_bak_2":"http://172.16.254.175:8080/ofpm/logical_topology/setFlow"
-}
